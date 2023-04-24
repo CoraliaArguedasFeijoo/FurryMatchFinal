@@ -1,8 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Observable, Subject } from 'rxjs';
+import { forkJoin, Observable, Subject, throwError } from 'rxjs';
 import { finalize, map, takeUntil, tap } from 'rxjs/operators';
+import { catchError } from 'rxjs/operators';
 
 import { PetFormService, PetFormGroup } from './pet-form.service';
 import { IPet } from '../pet.model';
@@ -17,7 +18,7 @@ import { Sex } from 'app/entities/enumerations/sex.model';
 import { IPhoto, NewPhoto } from '../../photo/photo.model';
 import Swal from 'sweetalert2';
 import { FormArray } from '@angular/forms';
-import dayjs from 'dayjs';
+import dayjs from 'dayjs/esm';
 
 @Component({
   selector: 'jhi-pet-update',
@@ -33,6 +34,8 @@ export class PetUpdateComponent implements OnInit {
   maxPhotos = 5;
   update = false;
 
+  activeImageIndex = 0;
+
   ownersSharedCollection: IOwner[] = [];
   breedsSharedCollection: IBreed[] = [];
 
@@ -42,6 +45,7 @@ export class PetUpdateComponent implements OnInit {
 
   pets: IPet[] = [];
   petFiles: File[] = [];
+  petUpdateFiles: File[] = [];
   petPhotos: string[][] = Array(5).fill([]);
 
   filteredBreedsSharedCollection: IBreed[] = [];
@@ -89,8 +93,6 @@ export class PetUpdateComponent implements OnInit {
     if (this.pet && this.pet.id) {
       this.photoService.findAllPhotosByPetID(this.pet.id).subscribe((response: HttpResponse<any[]>) => {
         const photos = response.body;
-        console.log('Pet object:', this.pet);
-        console.log('Pet photos:', photos);
 
         photos?.forEach((photo: any, index: number) => {
           if (photo.photoUrl) {
@@ -122,7 +124,8 @@ export class PetUpdateComponent implements OnInit {
   }
 
   onSelect(event?: any): void {
-    const maxPhotosReached = this.petFiles.length >= this.maxPhotos;
+    const maxPhotosReached = this.update ? this.petUpdateFiles.length >= this.maxPhotos : this.petFiles.length >= this.maxPhotos;
+
     if (maxPhotosReached) {
       Swal.fire({
         title: 'Error',
@@ -133,15 +136,95 @@ export class PetUpdateComponent implements OnInit {
       });
       return;
     }
-    this.petFiles.push(...event.addedFiles);
+
+    const filesArray = this.update ? this.petUpdateFiles : this.petFiles;
+    filesArray.push(...event.addedFiles);
   }
 
   onRemove(event?: any): void {
-    this.petFiles.splice(this.petFiles.indexOf(event), 1);
+    if (this.update) {
+      this.petUpdateFiles.splice(this.petUpdateFiles.indexOf(event), 1);
+    } else {
+      this.petFiles.splice(this.petFiles.indexOf(event), 1);
+    }
+  }
+
+  onRemoveFromDB(parentObj: { file: File }): void {
+    console.log('Removing:', parentObj.file);
+    const fileToRemove = parentObj.file;
+
+    const photoToRemoveIndex = this.petPhotoData.findIndex(photo => photo.file === fileToRemove);
+
+    if (photoToRemoveIndex >= 0) {
+      const removedPhoto = this.petPhotoData[photoToRemoveIndex];
+
+      if (removedPhoto) {
+        const removedPhotoUrl = removedPhoto.photoObj.photoUrl;
+        console.log('removedPhotoUrl:', removedPhotoUrl);
+
+        if (removedPhotoUrl) {
+          const removedPhotoId = removedPhoto.photoObj.id;
+          console.log('removedPhotoId:', removedPhotoId);
+
+          Swal.fire({
+            title: '¿Estás seguro?',
+            text: 'Esta acción eliminará la imagen permanentemente.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar',
+          }).then(result => {
+            if (result.value) {
+              this.petFiles.splice(photoToRemoveIndex, 1);
+              this.petPhotoData.splice(photoToRemoveIndex, 1);
+
+              // Si se trata de una foto existente, elimínela de la base de datos
+              if (removedPhotoId) {
+                this.deletePhotoFromDatabase(removedPhotoId);
+              }
+
+              Swal.fire({
+                title: 'Eliminada',
+                text: 'La imagen ha sido eliminada.',
+                icon: 'success',
+                confirmButtonColor: '#3085d6',
+                confirmButtonText: 'Aceptar',
+              });
+            }
+          });
+        }
+      }
+    }
+  }
+
+  deletePhotoFromDatabase(photoId: number): void {
+    this.photoService.delete(photoId).subscribe(() => {
+      console.log('Foto con id: ' + photoId + 'fue eliminada de la base de datos');
+    });
+    Swal.fire({
+      title: 'Fotografía borrada exitosamente',
+      text: 'Continuá actualizando los datos.',
+      icon: 'success',
+      confirmButtonColor: '#3381f6',
+      confirmButtonText: 'Cerrar',
+    });
   }
 
   onUpload(): void {
-    if (!this.petFiles.length) {
+    const files = this.update ? this.petUpdateFiles : this.petFiles;
+
+    console.log(
+      'Fotos nuevas:',
+      this.petFiles.map(file => file.name)
+    );
+    console.log(
+      'Fotos update:',
+      this.petUpdateFiles.map(file => file.name)
+    );
+
+    if (!files.length) {
       Swal.fire({
         title: 'Error',
         text: 'Debés primero arrastrar o seleccionar una imagen.',
@@ -152,27 +235,124 @@ export class PetUpdateComponent implements OnInit {
       return;
     }
 
-    this.petFiles.forEach(file_data => {
+    if (this.update) {
+      if (this.pet && this.pet.id) {
+        this.photoService.findAllPhotosByPetID(this.pet.id).subscribe((response: HttpResponse<any[]>) => {
+          const existingPhotos = response.body;
+          const totalPhotos = (existingPhotos?.length || 0) + files.length;
+
+          if (totalPhotos > 5) {
+            Swal.fire({
+              title: 'Error',
+              text: 'Solo se permiten hasta 5 fotos por mascota',
+              icon: 'error',
+              confirmButtonColor: '#3381f6',
+              confirmButtonText: 'Cerrar',
+            });
+            return;
+          }
+
+          const uploadObservables = files.map(file_data => {
+            const data = new FormData();
+            data.append('file', file_data);
+            data.append('upload_preset', 'furry_match');
+            data.append('cloud_name', 'alocortesu');
+
+            return this.petService.uploadImage(data);
+          });
+
+          forkJoin(uploadObservables).subscribe(responses => {
+            responses.forEach(response => {
+              const secureUrl = response.secure_url;
+              this.petPhotos.push(secureUrl);
+            });
+
+            Swal.fire({
+              title: 'Fotografías agregadas',
+              text: 'Continuá registrando los datos.',
+              icon: 'success',
+              confirmButtonColor: '#3381f6',
+              confirmButtonText: 'Cerrar',
+            });
+
+            const photos = this.createUpdatePhotosArray();
+            console.log('Objeto photos:', photos);
+
+            photos.forEach(photo => {
+              console.log('Foto a enviar al servicio: ', photos);
+
+              this.photoService.create(photo).subscribe(() => {
+                console.log('Foto ' + photo.photoUrl + ' fue ingresada a la base de datos');
+              });
+            });
+          });
+          this.uploadNewPhotos(files);
+        });
+      }
+    } else {
+      // Lógica original para fotos nuevas
+      files.forEach(file_data => {
+        const data = new FormData();
+        data.append('file', file_data);
+        data.append('upload_preset', 'furry_match');
+        data.append('cloud_name', 'alocortesu');
+
+        this.petService.uploadImage(data).subscribe(response => {
+          if (response) {
+            const secureUrl = response.secure_url;
+            this.petPhotos.push(secureUrl);
+
+            Swal.fire({
+              title: 'Fotografías agregadas',
+              text: 'Continuá registrando los datos.',
+              icon: 'success',
+              confirmButtonColor: '#3381f6',
+              confirmButtonText: 'Cerrar',
+            });
+          }
+        });
+        console.log(
+          'Fotos en onUpload',
+          files.map(file => file.name)
+        );
+      });
+    }
+  }
+
+  private uploadNewPhotos(files: File[]): void {
+    const uploadObservables = files.map(file_data => {
       const data = new FormData();
       data.append('file', file_data);
       data.append('upload_preset', 'furry_match');
       data.append('cloud_name', 'alocortesu');
 
-      this.petService.uploadImage(data).subscribe(response => {
-        if (response) {
-          const secureUrl = response.secure_url;
-          this.petPhotos.push(secureUrl);
+      return this.petService.uploadImage(data);
+    });
 
-          Swal.fire({
-            title: 'Fotografías agregadas',
-            text: 'Continuá registrando los datos.',
-            icon: 'success',
-            confirmButtonColor: '#3381f6',
-            confirmButtonText: 'Cerrar',
-          });
-        }
+    forkJoin(uploadObservables).subscribe(responses => {
+      responses.forEach(response => {
+        const secureUrl = response.secure_url;
+        this.petPhotos.push(secureUrl);
       });
-      console.log('Fotos en onUpload ' + this.petFiles);
+
+      Swal.fire({
+        title: 'Fotografías agregadas',
+        text: 'Continuá registrando los datos.',
+        icon: 'success',
+        confirmButtonColor: '#3381f6',
+        confirmButtonText: 'Cerrar',
+      });
+
+      const photos = this.createUpdatePhotosArray();
+      console.log('Objeto photos:', photos);
+
+      photos.forEach(photo => {
+        console.log('Foto a enviar al servicio: ', photo);
+
+        this.photoService.create(photo).subscribe(() => {
+          console.log('Foto ' + photo.photoUrl + ' fue ingresada a la base de datos');
+        });
+      });
     });
   }
 
@@ -203,8 +383,21 @@ export class PetUpdateComponent implements OnInit {
     this.isSaving = true;
     const pet = this.petFormService.getPet(this.editForm);
     console.log('Pet object:', pet);
-    pet.photos = this.createPhotosArray();
+    pet.photos = this.update ? [] : this.createPhotosArray();
     console.log(pet.photos.length);
+
+    if (!this.update && pet.photos.length === 0) {
+      Swal.fire({
+        title: 'Error',
+        text: 'Debés subir al menos una foto de la mascota antes de continuar.',
+        icon: 'error',
+        confirmButtonColor: '#3381f6',
+        confirmButtonText: 'Cerrar',
+      });
+      this.isSaving = false;
+      return;
+    }
+
     if (pet.id !== null) {
       this.subscribeToSaveResponse(this.petService.update(pet), 1);
     } else {
@@ -222,10 +415,27 @@ export class PetUpdateComponent implements OnInit {
         id: counter,
         uploadDate: null,
         photoUrl: photoUrl,
-        pet: null,
+        pet: this.update ? this.pet : null,
       };
       photos.push(photo);
       counter++;
+    }
+    return photos;
+  }
+
+  private createUpdatePhotosArray(): NewPhoto[] {
+    const photos: NewPhoto[] = [];
+
+    const flattenedPhotos = this.petPhotos.reduce((acc, val) => acc.concat(val), []);
+
+    for (const photoUrl of flattenedPhotos) {
+      const photo: NewPhoto = {
+        id: null,
+        uploadDate: dayjs(),
+        photoUrl: photoUrl,
+        pet: this.pet,
+      };
+      photos.push(photo);
     }
     return photos;
   }
@@ -308,13 +518,13 @@ export class PetUpdateComponent implements OnInit {
           console.log('borrado');
         });
       } else if (result.isDenied) {
-        Swal.fire({
+        /*Swal.fire({
           title: 'Error',
           text: 'No se pudo borrar tu mascota. Por favor intentá nuevamente.',
           icon: 'error',
           confirmButtonColor: '#3381f6',
           confirmButtonText: 'Cerrar',
-        });
+        });*/
       }
     });
   }

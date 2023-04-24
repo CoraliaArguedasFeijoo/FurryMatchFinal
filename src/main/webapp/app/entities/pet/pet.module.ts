@@ -9,10 +9,11 @@ import { NgxDropzoneModule } from 'ngx-dropzone';
 import { CloudinaryModule } from '@cloudinary/ng';
 import { CommonModule } from '@angular/common';
 import { GalleryModule } from '../../gallery/gallery.module';
+import { SearchMatchComponent } from './search-match/search-match.component';
 
 @NgModule({
   imports: [SharedModule, PetRoutingModule, NgxDropzoneModule, CloudinaryModule, CommonModule, GalleryModule],
-  declarations: [PetComponent, PetDetailComponent, PetUpdateComponent, PetDeleteDialogComponent],
+  declarations: [PetComponent, PetDetailComponent, PetUpdateComponent, PetDeleteDialogComponent, SearchMatchComponent],
   exports: [PetDetailComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })

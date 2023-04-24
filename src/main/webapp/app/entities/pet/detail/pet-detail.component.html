@@ -32,6 +32,9 @@
           <a [routerLink]="['/pet', pet.id, 'edit']" title="Actualizar mascota">
             <img src="../content/images/update_icon.png" />
           </a>
+          <div (click)="updateSearchCriteria()" title="Actualizar filtros">
+            <img src="../content/images/btn_filters.png" />
+          </div>
         </div>
         <dl>
           <div class="cnt-name cnt-pet-space">

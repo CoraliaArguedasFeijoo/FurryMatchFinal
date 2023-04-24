@@ -1,6 +1,5 @@
 package furrymatch.service;
 
-import furrymatch.domain.Owner;
 import furrymatch.domain.Pet;
 import furrymatch.domain.SearchCriteria;
 import furrymatch.repository.SearchCriteriaRepository;
@@ -28,6 +27,8 @@ public class SearchCriteriaService {
     private final UserRepository userRepository;
 
     private final PetService petService;
+
+    private Long selectedPet;
 
     public SearchCriteriaService(SearchCriteriaRepository searchCriteriaRepository, UserRepository userRepository, PetService petService) {
         this.searchCriteriaRepository = searchCriteriaRepository;
@@ -134,6 +135,23 @@ public class SearchCriteriaService {
     public Optional<SearchCriteria> findOne(Long id) {
         log.debug("Request to get SearchCriteria : {}", id);
         return searchCriteriaRepository.findById(id);
+    }
+
+    @Transactional(readOnly = true)
+    public SearchCriteria findByPetId(Long id) {
+        log.debug("Request to get SearchCriteria : {}", id);
+        return searchCriteriaRepository.findByPetId(id);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<SearchCriteria> findByOwnerUser() {
+        SecurityUtils
+            .getCurrentUserLogin()
+            .flatMap(userRepository::findOneByLogin)
+            .ifPresent(user -> {
+                selectedPet = Long.valueOf(user.getImageUrl());
+            });
+        return searchCriteriaRepository.findByOwnerUser(selectedPet);
     }
 
     /**

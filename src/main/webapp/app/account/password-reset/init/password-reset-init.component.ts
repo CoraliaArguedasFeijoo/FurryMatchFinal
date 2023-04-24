@@ -1,8 +1,7 @@
 import { Component, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { PasswordResetInitService } from './password-reset-init.service';
-// @ts-ignore
-import Swal from 'sweetalert2/dist/sweetalert2.all.js';
+import Swal from 'sweetalert2';
 
 @Component({
   selector: 'jhi-password-reset-init',

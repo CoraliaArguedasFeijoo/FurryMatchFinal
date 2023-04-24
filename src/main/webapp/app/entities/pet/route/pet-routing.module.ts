@@ -6,6 +6,7 @@ import { PetComponent } from '../list/pet.component';
 import { PetDetailComponent } from '../detail/pet-detail.component';
 import { PetUpdateComponent } from '../update/pet-update.component';
 import { PetRoutingResolveService } from './pet-routing-resolve.service';
+import { SearchMatchComponent } from '../search-match/search-match.component';
 import { ASC } from 'app/config/navigation.constants';
 
 const petRoute: Routes = [
@@ -36,6 +37,14 @@ const petRoute: Routes = [
   {
     path: ':id/edit',
     component: PetUpdateComponent,
+    resolve: {
+      pet: PetRoutingResolveService,
+    },
+    canActivate: [UserRouteAccessService],
+  },
+  {
+    path: 'search',
+    component: SearchMatchComponent,
     resolve: {
       pet: PetRoutingResolveService,
     },

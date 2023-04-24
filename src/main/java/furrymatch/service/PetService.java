@@ -3,14 +3,11 @@ package furrymatch.service;
 import furrymatch.domain.Owner;
 import furrymatch.domain.Pet;
 import furrymatch.domain.Photo;
-import furrymatch.repository.OwnerRepository;
-import furrymatch.repository.PetRepository;
-import furrymatch.repository.PhotoRepository;
-import furrymatch.repository.UserRepository;
+import furrymatch.domain.SearchCriteria;
+import furrymatch.repository.*;
 import furrymatch.security.SecurityUtils;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -31,16 +28,20 @@ public class PetService {
     private final UserRepository userRepository;
     private final OwnerRepository ownerRepository;
 
+    private final SearchPetRepository searchPetRepository;
+
     public PetService(
         PetRepository petRepository,
         PhotoRepository photoRepository,
         UserRepository userRepository,
-        OwnerRepository ownerRepository
+        OwnerRepository ownerRepository,
+        SearchPetRepository searchPetRepository
     ) {
         this.petRepository = petRepository;
         this.photoRepository = photoRepository;
         this.userRepository = userRepository;
         this.ownerRepository = ownerRepository;
+        this.searchPetRepository = searchPetRepository;
     }
 
     /**
@@ -203,6 +204,27 @@ public class PetService {
         return newPets;
     }
 
+    public List<Pet> searchPets(SearchCriteria searchCriteria, Long ownerId) {
+        // log.debug("Request to get all Pets based on search criteria");
+        List<Pet> pets = searchPetRepository.searchPets(searchCriteria, ownerId);
+
+        // System.out.println("Pets returned by searchPetRepository.searchPets():");
+        pets.forEach(System.out::println);
+        ArrayList<Pet> newPets = new ArrayList<>();
+        pets.forEach(pet -> {
+            Set<Photo> petPhotos = pet.getPhotos();
+            if (petPhotos == null) {
+                petPhotos = new HashSet<>();
+            }
+            List<Photo> photosByPetID = photoRepository.findAllPhotosByPetID(pet.getId());
+            petPhotos.addAll(photosByPetID);
+            pet.setPhotos(petPhotos);
+            newPets.add(pet);
+            // System.out.println("List of pets" + pet);
+        });
+        return newPets;
+    }
+
     /**
      * Get one pet by id.
      *
@@ -223,5 +245,19 @@ public class PetService {
     public void delete(Long id) {
         log.debug("Request to delete Pet : {}", id);
         petRepository.deleteById(id);
+    }
+
+    @Transactional(readOnly = true)
+    public Long getCurrentUserPetId() {
+        return SecurityUtils
+            .getCurrentUserLogin()
+            .flatMap(userRepository::findOneByLogin)
+            .map(user -> Long.valueOf(user.getImageUrl()))
+            .orElseThrow(() -> new IllegalStateException("User pet ID not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Long> getPetId() {
+        return SecurityUtils.getCurrentUserLogin().flatMap(userRepository::findOneByLogin).map(user -> Long.valueOf(user.getImageUrl()));
     }
 }

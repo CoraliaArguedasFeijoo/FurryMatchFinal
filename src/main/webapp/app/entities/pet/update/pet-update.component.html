@@ -2,8 +2,8 @@
   <h1 class="title">Mi mascota</h1>
   <div>
     <div class="profile-pic">
-      <div class="profile-pic-div">
-        <ngx-dropzone *ngIf="petFiles.length <= maxPhotos" (change)="onSelect($event)" [multiple]="true">
+      <div *ngIf="!update">
+        <ngx-dropzone *ngIf="petFiles.length <= maxPhotos" (change)="onSelect($event)" [multiple]="true" class="profile-pic-div">
           <ngx-dropzone-label>Arrastrá o seleccioná<br />una foto</ngx-dropzone-label>
 
           <ngx-dropzone-image-preview
@@ -13,8 +13,56 @@
             (removed)="onRemove({ file: $event })"
           ></ngx-dropzone-image-preview>
         </ngx-dropzone>
+        <button (click)="onUpload()" class="btn-blue">Subir</button>
       </div>
-      <button (click)="onUpload()" class="btn btn-blue">Subir</button>
+
+      <div *ngIf="update">
+        <div class="gallery-container">
+          <img
+            src="../content/images/btn_left.png"
+            class="gallery-prev-left"
+            (click)="activeImageIndex = (activeImageIndex - 1 + petFiles.length) % petFiles.length"
+            [style.pointer-events]="activeImageIndex === 0 ? 'none' : 'auto'"
+            [style.opacity]="activeImageIndex === 0 ? '0.5' : '1'"
+          />
+          <div class="image-wrapper">
+            <ng-container *ngFor="let file of petFiles; let index = index">
+              <ngx-dropzone-image-preview
+                class="img-preview"
+                *ngIf="index === activeImageIndex"
+                [file]="file"
+                [removable]="true"
+                (removed)="onRemoveFromDB({ file: $event })"
+              ></ngx-dropzone-image-preview>
+            </ng-container>
+          </div>
+          <img
+            src="../content/images/btn_right.png"
+            class="gallery-next-right"
+            (click)="activeImageIndex = (activeImageIndex + 1) % petFiles.length"
+            [style.pointer-events]="activeImageIndex === petFiles.length - 1 ? 'none' : 'auto'"
+            [style.opacity]="activeImageIndex === petFiles.length - 1 ? '0.5' : '1'"
+          />
+        </div>
+        <div class="cnt-txt-upd">
+          <label class="lbl-txt">
+            <span class="line-1">Si deseás eliminar alguna foto de tu mascota,</span>
+            <span class="line-2">presiona el botón "x"</span>
+          </label>
+        </div>
+
+        <ngx-dropzone *ngIf="petUpdateFiles.length <= maxPhotos" (change)="onSelect($event)" [multiple]="true" class="profile-pic-div">
+          <ngx-dropzone-label>Arrastrá o seleccioná<br />tus nuevas fotos aquí</ngx-dropzone-label>
+
+          <ngx-dropzone-image-preview
+            *ngFor="let file of petUpdateFiles; let index = index"
+            [file]="file"
+            [removable]="true"
+            (removed)="onRemove({ file: $event })"
+          ></ngx-dropzone-image-preview>
+        </ngx-dropzone>
+        <button (click)="onUpload()" class="btn-blue">Subir</button>
+      </div>
     </div>
 
     <form name="editForm" role="form" novalidate (ngSubmit)="save()" [formGroup]="editForm">

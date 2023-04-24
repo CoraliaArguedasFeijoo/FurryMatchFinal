@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { RegisterService } from '../../../account/register/register.service';
 import { PhotoService } from '../../photo/service/photo.service';
 import { PetService } from '../service/pet.service';
@@ -11,6 +11,8 @@ import { focusOn } from '@cloudinary/url-gen/qualifiers/gravity';
 import { IPhoto } from '../../photo/photo.model';
 import { switchMap } from 'rxjs';
 import { HttpResponse } from '@angular/common/http';
+import { SearchCriteriaService } from '../../search-criteria/service/search-criteria.service';
+import { ISearchCriteria } from '../../search-criteria/search-criteria.model';
 
 @Component({
   selector: 'jhi-pet-detail',
@@ -37,7 +39,9 @@ export class PetDetailComponent implements OnInit {
     protected activatedRoute: ActivatedRoute,
     private registerService: RegisterService,
     protected photoService: PhotoService,
-    protected petService: PetService
+    protected petService: PetService,
+    protected searchCriteriaService: SearchCriteriaService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -55,6 +59,17 @@ export class PetDetailComponent implements OnInit {
   load(): void {
     this.activatedRoute.params.pipe(switchMap(({ id }) => this.petService.find(id))).subscribe(response => {
       this.onSuccess(response);
+    });
+  }
+
+  updateSearchCriteria(): void {
+    this.searchCriteriaService.findByUser().subscribe((response: HttpResponse<ISearchCriteria>) => {
+      const searchCriteria = response.body;
+      if (searchCriteria?.id !== null) {
+        this.router.navigate(['/search-criteria/' + searchCriteria?.id + '/edit']);
+      } else {
+        console.log('no');
+      }
     });
   }
 

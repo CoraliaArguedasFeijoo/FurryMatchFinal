@@ -37,6 +37,13 @@ export class SearchCriteriaService {
   find(id: number): Observable<EntityResponseType> {
     return this.http.get<ISearchCriteria>(`${this.resourceUrl}/${id}`, { observe: 'response' });
   }
+  findByPetId(id: number): Observable<EntityResponseType> {
+    return this.http.get<ISearchCriteria>(`${this.resourceUrl}/petId/${id}`, { observe: 'response' });
+  }
+
+  findByUser(): Observable<EntityResponseType> {
+    return this.http.get<ISearchCriteria>(`${this.resourceUrl}/user`, { observe: 'response' });
+  }
 
   query(req?: any): Observable<EntityArrayResponseType> {
     const options = createRequestOption(req);

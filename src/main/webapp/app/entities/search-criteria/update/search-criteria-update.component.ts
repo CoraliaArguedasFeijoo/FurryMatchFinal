@@ -67,6 +67,8 @@ export class SearchCriteriaUpdateComponent implements OnInit {
       this.searchCriteria = searchCriteria;
       if (searchCriteria) {
         this.updateForm(searchCriteria);
+        this.getCantones(Number(searchCriteria.provice));
+        this.getDistricts(Number(searchCriteria.provice), Number(searchCriteria.canton));
       }
       this.registerService.getProvinces().subscribe((response: any) => {
         const provincesArray = Object.entries(response).map(([id, name]) => ({ id, name }));
@@ -91,8 +93,8 @@ export class SearchCriteriaUpdateComponent implements OnInit {
   save(): void {
     this.isSaving = true;
     const searchCriteria = this.searchCriteriaFormService.getSearchCriteria(this.editForm);
-    console.log(searchCriteria);
     if (searchCriteria.id !== null) {
+      searchCriteria.objective = this.objective;
       this.subscribeToSaveResponse(this.searchCriteriaService.update(searchCriteria));
     } else {
       searchCriteria.objective = this.objective;
@@ -150,7 +152,14 @@ export class SearchCriteriaUpdateComponent implements OnInit {
     this.breedService
       .query()
       .pipe(map((res: HttpResponse<IBreed[]>) => res.body ?? []))
-      .subscribe((breeds: IBreed[]) => (this.breedsSharedCollection = breeds));
+      .subscribe((breeds: IBreed[]) => {
+        this.breedsSharedCollection = breeds;
+        if (this.searchCriteria) {
+          this.filteredBreedsSharedCollection = this.breedsSharedCollection.filter(
+            breed => breed.breedType === this.searchCriteria?.filterType
+          );
+        }
+      });
   }
 
   selected = '';
@@ -205,7 +214,6 @@ export class SearchCriteriaUpdateComponent implements OnInit {
       console.log('El valor de petType está vacío');
       this.filteredBreedsSharedCollection = [];
     }
-    console.log('Filtered breeds:', this.filteredBreedsSharedCollection);
   }
 
   ngOnDestroy(): void {
@@ -217,10 +225,36 @@ export class SearchCriteriaUpdateComponent implements OnInit {
     if (obj === 1) {
       this.objective = 1;
       this.title = 'Quiero cruzar a mi mascota y busco una con estas características y condiciones:';
+      if (this.searchCriteria) {
+        if (this.objective != this.searchCriteria.objective) {
+          this.editForm.controls['filterType'].reset();
+          this.editForm.controls['breed'].reset();
+          this.editForm.controls['sex'].reset();
+          this.editForm.controls['provice'].reset();
+          this.editForm.controls['canton'].reset();
+          this.editForm.controls['district'].reset();
+          this.editForm.controls['tradePups'].reset();
+          this.editForm.controls['tradeMoney'].reset();
+          this.editForm.controls['pedigree'].reset();
+        }
+      }
       this.step = 2;
     } else {
       this.objective = 2;
       this.title = 'Busco amistades para mi mascota con estas características:';
+      if (this.searchCriteria) {
+        if (this.objective != this.searchCriteria.objective) {
+          this.editForm.controls['filterType'].reset();
+          this.editForm.controls['breed'].reset();
+          this.editForm.controls['sex'].reset();
+          this.editForm.controls['provice'].reset();
+          this.editForm.controls['canton'].reset();
+          this.editForm.controls['district'].reset();
+          this.editForm.controls['tradePups'].reset();
+          this.editForm.controls['tradeMoney'].reset();
+          this.editForm.controls['pedigree'].reset();
+        }
+      }
       this.step = 2;
     }
   }

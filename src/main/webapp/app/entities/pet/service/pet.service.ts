@@ -6,6 +6,7 @@ import { isPresent } from 'app/core/util/operators';
 import { ApplicationConfigService } from 'app/core/config/application-config.service';
 import { createRequestOption } from 'app/core/request/request-util';
 import { IPet, NewPet } from '../pet.model';
+import { ISearchCriteria, NewSearchCriteria } from '../../search-criteria/search-criteria.model';
 import { IPhoto } from '../../photo/photo.model';
 
 export type PartialUpdatePet = Partial<IPet> & Pick<IPet, 'id'>;
@@ -80,5 +81,13 @@ export class PetService {
     return this.http.post<HttpResponse<{}>>(`${this.accountUrl}/${id}`, {
       observe: 'response',
     });
+  }
+  search(): Observable<HttpResponse<IPet[]>> {
+    const searchUrl = `${this.resourceUrl}/search`;
+    return this.http.get<IPet[]>(searchUrl, { observe: 'response' });
+  }
+
+  getPetInSession(): Observable<HttpResponse<number>> {
+    return this.http.get<number>(`${this.resourceUrl}/current`, { observe: 'response' });
   }
 }
